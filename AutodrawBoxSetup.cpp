@@ -16,13 +16,24 @@ SCDLLName("AdrianCodes - Update box details based on box length")
         return;
     }
     s_UseTool ChartDrawing;
-    ChartDrawing.AddMethod = UTAM_ADD_OR_ADJUST;
-    int &r_LineNumber = sc.GetPersistentInt(1);
     float BoxHigh;
     float BoxLow;
 
     if (sc.GetUserDrawnChartDrawing(0, DRAWING_RECTANGLEHIGHLIGHT, ChartDrawing, -1))
     {
+        // msg.Format("Box High: %f", BoxHigh);
+        // sc.AddMessageToLog(msg, 1);
+        // msg.Format("Box Low: '%f'", BoxLow);
+        // sc.AddMessageToLog(msg, 1);
+        // msg.Format("Begin: '%i'", ChartDrawing.BeginIndex);
+        // sc.AddMessageToLog(msg, 1);
+        // msg.Format("End: '%i'", ChartDrawing.EndIndex);
+        // sc.AddMessageToLog(msg, 1);
+        // msg.Format("Current: '%i'", sc.Index);
+        // sc.AddMessageToLog(msg, 1);
+
+        ChartDrawing.AddMethod = UTAM_ADD_OR_ADJUST;
+        // int r_LineNumber = sc.GetPersistentInt(1);
         if (ChartDrawing.BeginValue > ChartDrawing.EndValue)
         {
             BoxHigh = ChartDrawing.BeginValue;
@@ -34,25 +45,54 @@ SCDLLName("AdrianCodes - Update box details based on box length")
             BoxLow = ChartDrawing.BeginValue;
         }
 
-        // msg.Format("Box High: %f", BoxHigh);
-        // sc.AddMessageToLog(msg, 1);
-        // msg.Format("Box Low: '%f'", BoxLow);
-        // sc.AddMessageToLog(msg, 1);
-        // msg.Format("Begin: '%i'", ChartDrawing.BeginIndex);
-        // sc.AddMessageToLog(msg, 1);
-        // msg.Format("End: '%i'", ChartDrawing.EndIndex);
-        // sc.AddMessageToLog(msg, 1);
+        // If ChartDrawing is drawn past the current bar, snap back to current bar Index
+        // if (ChartDrawing.EndIndex > sc.Index)
+        // {
+        //     msg.Format("End: '%i'", ChartDrawing.EndIndex);
+        //     sc.AddMessageToLog(msg, 1);
+        //     msg.Format("Current: '%i'", sc.Index);
+        //     sc.AddMessageToLog(msg, 1);
+        //     msg.Format("Setting %i, to %i", ChartDrawing.EndIndex, sc.Index);
+        //     sc.AddMessageToLog(msg, 1);
+        //     ChartDrawing.EndDateTime.Clear();
+        //     ChartDrawing.EndIndex = sc.Index;
+        //     sc.UseTool(ChartDrawing);
+        //     msg.Format("Updated: '%i'", ChartDrawing.BeginIndex);
+        //     sc.AddMessageToLog(msg, 1);
+        //     msg.Format("Updated: '%i'", ChartDrawing.EndIndex);
+        //     sc.AddMessageToLog(msg, 1);
+        // }
 
-        int BoxLength = (ChartDrawing.EndIndex - ChartDrawing.BeginIndex);
-        // if current price is withng high and low and current index is < EndIndex move EndIndex over 1
-        // to avoid having to keep moving box end boundary
-        if (sc.BaseData[SC_LAST][sc.Index] < ChartDrawing.EndValue && sc.BaseData[SC_LAST][sc.Index] > ChartDrawing.BeginValue)
+        bool BoxExtendable = false;
+        // if current price is withn high and low
+        // and previous candle didn't have a low close above BoxHigh or a high close below BoxLow (meaning box broke out already)
+        // and current index is < EndIndex move EndIndex over 1 to avoid having to keep moving box end boundary
+        // trying to use current end index of box plus 1 for the next bar to keep the current last price from within the box and not many
+        // bars past the box to prevent extending way past when trading back into the original box
+
+        // maybe check if the current index is +1 of the endindex before making it extendable
+        if (sc.Index == ChartDrawing.EndIndex + 1)
+        {
+            // update this to use the midline logic
+            if (sc.BaseData[SC_LAST][sc.Index] < BoxHigh && sc.BaseData[SC_LOW][ChartDrawing.EndIndex - 1] < BoxHigh)
+            {
+                BoxExtendable = true;
+            }
+            if (sc.BaseData[SC_LAST][sc.Index] > BoxLow && sc.BaseData[SC_HIGH][ChartDrawing.EndIndex - 1] > BoxLow)
+            {
+                BoxExtendable = true;
+            }
+        }
+        int BoxLength = (ChartDrawing.EndIndex - ChartDrawing.BeginIndex) + 1;
+        // ChartDrawing.LineNumber = r_LineNumber;
+        if (BoxExtendable && ChartDrawing.EndIndex != sc.Index && BoxLength < 14)
         {
             ChartDrawing.EndDateTime.Clear();
-            ChartDrawing.EndIndex = sc.Index;
+            ChartDrawing.EndIndex = ChartDrawing.EndIndex + 1;
             sc.UseTool(ChartDrawing);
         }
 
+        BoxLength = (ChartDrawing.EndIndex - ChartDrawing.BeginIndex) + 1;
         if (BoxLength > 3 & BoxLength < 8)
         {
             ChartDrawing.Color = RGB(255, 255, 0);
@@ -74,6 +114,7 @@ SCDLLName("AdrianCodes - Update box details based on box length")
             ChartDrawing.Text = msg;
             sc.UseTool(ChartDrawing);
         }
+        // r_LineNumber = ChartDrawing.LineNumber;
 
         sc.Subgraph[0].Name = "Box Triggers Up";
         sc.Subgraph[0].DrawStyle = DRAWSTYLE_ARROW_UP;
@@ -94,7 +135,7 @@ SCDLLName("AdrianCodes - Update box details based on box length")
             MarkerDrawingUp.MarkerType = MARKER_TRIANGLEUP;
             MarkerDrawingUp.Color = COLOR_GREEN;
             MarkerDrawingUp.AddMethod = UTAM_ADD_OR_ADJUST;
-            MarkerDrawingUp.MarkerSize = 20;
+            MarkerDrawingUp.MarkerSize = 15;
             MarkerDrawingUp.BeginIndex = sc.Index;
             MarkerDrawingUp.BeginValue = ChartDrawing.EndValue;
             sc.UseTool(MarkerDrawingUp);
@@ -113,7 +154,7 @@ SCDLLName("AdrianCodes - Update box details based on box length")
             MarkerDrawingDown.MarkerType = MARKER_TRIANGLEDOWN;
             MarkerDrawingDown.Color = COLOR_RED;
             MarkerDrawingDown.AddMethod = UTAM_ADD_OR_ADJUST;
-            MarkerDrawingDown.MarkerSize = 20;
+            MarkerDrawingDown.MarkerSize = 15;
             MarkerDrawingDown.BeginIndex = sc.Index;
             MarkerDrawingDown.BeginValue = ChartDrawing.BeginValue;
             sc.UseTool(MarkerDrawingDown);
